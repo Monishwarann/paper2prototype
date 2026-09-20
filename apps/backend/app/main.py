@@ -221,6 +221,23 @@ def generate_code_blueprint(project_id: str):
     art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
     return {"status": "success", "starter_files": art.starter_code_blueprint}
 
+# 14b. GET /api/projects/{project_id}/critic
+@app.get("/api/projects/{project_id}/critic")
+def get_architecture_critic(project_id: str):
+    from services.ai_service.architecture_critic import architecture_critic
+    art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
+    art_dict = art.model_dump() if art else {}
+    return architecture_critic.audit_architecture(art_dict)
+
+# 14c. GET /api/projects/{project_id}/cost-estimate
+@app.get("/api/projects/{project_id}/cost-estimate")
+def get_cost_estimate(project_id: str):
+    from services.ai_service.architecture_critic import architecture_critic
+    art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
+    art_dict = art.model_dump() if art else {}
+    audit = architecture_critic.audit_architecture(art_dict)
+    return audit.get("cost_estimation", {})
+
 # 15. GET /api/projects/{project_id}/artifacts
 @app.get("/api/projects/{project_id}/artifacts", response_model=ResearchBlueprintArtifact)
 def get_project_artifacts(project_id: str):
