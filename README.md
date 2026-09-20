@@ -295,4 +295,6 @@ python -c "import sys, os; sys.path.extend(['.', 'apps/backend']); from tests.te
 
 ## 📜 License
 
-MIT License &copy; 2026 Paper2Prototype Team.
+Copyright (c) 2026 Monishwaran. All Rights Reserved.  
+Released under the [MIT License](LICENSE).
+
