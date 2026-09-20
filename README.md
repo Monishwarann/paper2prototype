@@ -18,24 +18,55 @@ Paper2Prototype is an enterprise AI-powered research-to-implementation platform.
 
 ---
 
-## 🏗️ Monorepo Architecture
+## 🏗️ Detailed Frontend & Backend Architecture
 
 ```
 paper2prototype/
 ├── api/
-│   └── index.py             # Vercel Serverless Function entry point
+│   └── index.py                      # Vercel Serverless Function entry point
+│
 ├── apps/
-│   ├── frontend/            # Next.js 14 (App Router), React Flow, Monaco Editor, Tailwind CSS
-│   └── backend/             # FastAPI API Gateway, Pydantic v2, SQLAlchemy, Auth
+│   ├── frontend/                     # Next.js 14 Web Application
+│   │   ├── src/
+│   │   │   ├── app/
+│   │   │   │   ├── layout.tsx        # App Root Layout & Theme Provider
+│   │   │   │   ├── page.tsx          # Landing Page & Drag-and-Drop PDF Upload Zone
+│   │   │   │   ├── globals.css       # Tailwind Glassmorphism & Dark Design Tokens
+│   │   │   │   └── projects/[id]/
+│   │   │   │       └── page.tsx      # Interactive Engineering Workspace Dashboard
+│   │   │   └── components/
+│   │   │       ├── ReactFlowCanvas.tsx   # Interactive Architecture Node Diagram
+│   │   │       ├── MonacoCodeViewer.tsx  # Multi-File Starter Code Editor
+│   │   │       └── EvidenceBadge.tsx     # Provenance Badge & Source Quote Renderer
+│   │   ├── next.config.mjs
+│   │   ├── tailwind.config.js
+│   │   ├── tsconfig.json
+│   │   └── package.json
+│   │
+│   └── backend/                      # FastAPI Backend Gateway
+│       ├── app/
+│       │   ├── main.py               # REST API Routes, File Handlers, Exception Middleware
+│       │   └── models/
+│       │       └── schemas.py        # Pydantic v2 Models for 28 Output Artifacts
+│       └── requirements.txt
+│
 ├── services/
-│   ├── document_service/    # PyMuPDF & pdfplumber document parser, section detector, semantic chunker
-│   └── ai_service/          # 12 Specialized AI Agents, RAG Vector Engine & Evidence Mapper
-├── workers/                 # Celery & Redis task queue
-├── docker/                  # Docker Compose orchestration
-├── database/                # PostgreSQL DDL schemas & Alembic migrations
-├── tests/                   # Pytest test suite
-├── vercel.json              # Vercel deployment configuration
-├── requirements.txt         # Root Python requirements for Vercel
+│   ├── document_service/             # Document Processing Pipeline
+│   │   ├── pdf_parser.py             # PyMuPDF Section Detector & Metadata Extractor
+│   │   └── chunker.py                # Semantic Chunker with Page/Section Metadata
+│   └── ai_service/                   # Multi-Agent & RAG Engine
+│       ├── agent_orchestrator.py     # 12 Specialized AI Agents Coordinator
+│       ├── evidence_engine.py        # Anti-Hallucination Source Attribution Engine
+│       ├── llm_client.py             # Groq, Gemini & HuggingFace Unified LLM Router
+│       └── rag_engine.py             # Embedding Generation & Semantic Retriever
+│
+├── workers/                          # Celery & Redis Task Queue
+├── docker/                           # Container Infrastructure
+├── tests/
+│   └── test_platform.py              # Pytest Verification Suite
+├── vercel.json                       # Vercel Deployment Route Map
+├── requirements.txt                  # Root Dependencies for Vercel Python Runtime
+├── .gitignore
 ├── .env.example
 └── README.md
 ```
@@ -49,87 +80,39 @@ Paper2Prototype supports multi-provider fallback out of the box:
 - **Google Gemini API**: `GEMINI_API_KEY` (Gemini 2.5 Flash & Embeddings)
 - **HuggingFace API**: `HUGGINGFACE_API_KEY` (Feature Extraction Embeddings)
 
-### Environment Variables (`.env`)
-
-```env
-# Application
-APP_NAME="Paper2Prototype"
-APP_ENV="development"
-PORT=8000
-FRONTEND_URL="http://localhost:3000"
-
-# AI Provider Keys
-GROQ_API_KEY="your-groq-api-key"
-GEMINI_API_KEY="your-gemini-api-key"
-HUGGINGFACE_API_KEY="your-huggingface-api-key"
-DEFAULT_AI_PROVIDER="groq"
-AI_MODEL_NAME="llama-3.3-70b-versatile"
-
-# Database
-DATABASE_URL="sqlite+aiosqlite:///./paper2prototype.db"
-
-# Security
-AUTH_SECRET="super-secret-key-min-32-chars"
-```
-
 ---
 
-## ☁️ Deploying to Vercel
+## ☁️ Deploying to Vercel (2-Step Guide)
 
-Paper2Prototype includes native Vercel support (`vercel.json` & `api/index.py`).
+### **Step 1: Import Repository in Vercel**
+1. Open **[vercel.com/new](https://vercel.com/new)**.
+2. Select repository **`Monishwarann/paper2prototype`** and click **Import**.
 
-### Method 1: Deploy via Vercel CLI
-```bash
-npm i -g vercel
-vercel
-```
+### **Step 2: Add Environment Variables & Deploy**
+Add environment variables in Vercel settings:
+- `GROQ_API_KEY`
+- `GEMINI_API_KEY`
+- `HUGGINGFACE_API_KEY`
+- `DEFAULT_AI_PROVIDER` (`groq`)
 
-### Method 2: Deploy via GitHub & Vercel Dashboard
-1. Push your repository to GitHub:
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial Paper2Prototype commit"
-   git remote add origin https://github.com/Monishwarann/paper2prototype.git
-   git push -u origin main
-   ```
-2. Go to **[vercel.com/new](https://vercel.com/new)** and import your GitHub repository.
-3. Configure your environment variables in Vercel.
-4. Click **Deploy**. Vercel will build the Next.js frontend and Python serverless API functions automatically!
+Click **Deploy**!
 
 ---
 
 ## 💻 Running Locally
 
-### 1. Run Backend Server (FastAPI)
+### 1. Backend Server (FastAPI)
 ```bash
 cd apps/backend
 pip install -r requirements.txt
 python -m uvicorn app.main:app --reload --port 8000
 ```
-- API Documentation: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-### 2. Run Frontend Client (Next.js)
+### 2. Frontend Client (Next.js)
 ```bash
 cd apps/frontend
 npm install
 npm run dev
-```
-- Dashboard UI: [http://localhost:3000](http://localhost:3000)
-- Demo Workspace: [http://localhost:3000/projects/demo-medical-classifier](http://localhost:3000/projects/demo-medical-classifier)
-
-### 3. Run via Docker Compose
-```bash
-docker-compose up --build
-```
-
----
-
-## 🧪 Testing
-
-Run platform test suite:
-```bash
-python -c "import sys, os; sys.path.extend(['.', 'apps/backend']); from tests.test_platform import *; test_evidence_engine_classification(); test_evidence_coverage_scoring(); test_agent_orchestrator_blueprint(); test_llm_client_initialization(); print('ALL TESTS PASSED!')"
 ```
 
 ---
