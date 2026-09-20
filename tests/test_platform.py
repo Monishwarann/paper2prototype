@@ -1,10 +1,15 @@
 import os
-import pytest
+try:
+    import pytest
+except ImportError:
+    pytest = None
+
 from apps.backend.app.models.schemas import EvidenceType, CitationEvidence, ResearchBlueprintArtifact
 from services.ai_service.evidence_engine import evidence_engine
 from services.document_service.pdf_parser import pdf_parser
 from services.document_service.chunker import chunker
 from services.ai_service.agent_orchestrator import agent_orchestrator
+from services.ai_service.architecture_critic import architecture_critic
 from services.ai_service.llm_client import llm_client
 
 def test_evidence_engine_classification():
@@ -38,6 +43,14 @@ def test_agent_orchestrator_blueprint():
     assert len(artifact.starter_code_blueprint) > 0
     assert artifact.proto_readiness_score > 80
 
+def test_architecture_critic():
+    parsed = {"title": "Test Paper", "abstract": "Test abstract", "pages": []}
+    chunks = [{"chunk_id": "c1", "document_id": "p1", "page_number": 1, "section": "Abstract", "source_text": "Test"}]
+    artifact = agent_orchestrator.process_paper("p1", parsed, chunks)
+    art_dict = artifact.model_dump()
+    audit = architecture_critic.audit_architecture(art_dict)
+    assert audit["feasibility_score"] >= 90
+    assert "cost_estimation" in audit
+
 def test_llm_client_initialization():
-    assert llm_client.groq_api_key != ""
-    assert llm_client.provider in ["groq", "gemini", "openai"]
+    assert llm_client.provider in ["groq", "gemini", "huggingface", "openai"]

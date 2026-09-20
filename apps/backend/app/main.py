@@ -1,10 +1,12 @@
 import os
+import sys
 import uuid
 import json
+import time
 import asyncio
 import logging
 from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
@@ -15,16 +17,20 @@ from services.document_service.pdf_parser import pdf_parser
 from services.document_service.chunker import chunker
 from services.ai_service.agent_orchestrator import agent_orchestrator
 from services.ai_service.architecture_critic import architecture_critic
+from services.ai_service.llm_client import llm_client
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("Paper2Prototype")
 
+START_TIME = time.time()
+
 app = FastAPI(
-    title="Paper2Prototype Platform API",
-    description="Turn Research Papers Into Real-World Software Prototypes",
-    version="1.0.0"
+    title="Paper2Prototype Platform API Gateway",
+    description="Enterprise AI-Powered Research-to-Software Engineering Platform",
+    version="1.1.0"
 )
 
+# 1. CORS Middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -33,16 +39,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 2. Security Headers & Request Tracing Middleware
 @app.middleware("http")
-async def add_security_headers(request, call_next):
-    response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    return response
+async def process_request_diagnostics(request: Request, call_next):
+    start = time.time()
+    req_id = uuid.uuid4().hex[:8]
+    request.state.req_id = req_id
+    
+    try:
+        response = await call_next(request)
+        process_time = (time.time() - start) * 1000
+        response.headers["X-Request-ID"] = req_id
+        response.headers["X-Process-Time-MS"] = f"{process_time:.2f}"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+    except Exception as exc:
+        logger.error(f"[REQ:{req_id}] Unhandled error during request processing: {exc}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "Internal System Error",
+                "code": "ERR_SYSTEM_UNHANDLED_EXCEPTION",
+                "request_id": req_id,
+                "message": str(exc)
+            }
+        )
 
-# In-memory database store for fast local & serverless execution
+# In-memory database store
 PROJECTS_DB: Dict[str, Dict[str, Any]] = {}
 ARTIFACTS_DB: Dict[str, ResearchBlueprintArtifact] = {}
 UPLOAD_DIR = "./uploads"
@@ -69,10 +95,26 @@ ARTIFACTS_DB[DEMO_ID] = agent_orchestrator.process_paper(DEMO_ID, demo_parsed, d
 def read_root():
     return {
         "name": "Paper2Prototype API Gateway",
-        "tagline": "Turn Research Papers Into Real-World Prototypes",
-        "version": "1.0.0",
+        "tagline": "Turn Research Papers Into Real-World Software Prototypes",
+        "version": "1.1.0",
         "status": "running",
-        "endpoints_count": 25
+        "active_provider": llm_client.provider,
+        "endpoints_count": 27
+    }
+
+# Diagnostics & Health Check Endpoint
+@app.get("/api/v1/health")
+def health_diagnostics():
+    uptime_seconds = int(time.time() - START_TIME)
+    return {
+        "status": "healthy",
+        "uptime_seconds": uptime_seconds,
+        "active_ai_provider": llm_client.provider,
+        "groq_configured": bool(llm_client.groq_api_key),
+        "gemini_configured": bool(llm_client.gemini_api_key),
+        "huggingface_configured": bool(llm_client.hf_api_key),
+        "projects_count": len(PROJECTS_DB),
+        "artifacts_count": len(ARTIFACTS_DB)
     }
 
 # 1. POST /api/projects
@@ -87,7 +129,7 @@ def create_project(project: ProjectCreate):
         "created_at": "2026-09-20T14:00:00Z",
         "paper_filename": None,
         "domain": "General Computer Science",
-        "provider": "groq"
+        "provider": llm_client.provider
     }
     PROJECTS_DB[pid] = p_data
     return ProjectResponse(**p_data)
@@ -142,12 +184,12 @@ async def upload_paper(project_id: str, file: UploadFile = File(...)):
         "message": "Paper uploaded and analyzed successfully!"
     }
 
-# 5. GET /api/projects/{project_id}/events (Server-Sent Events Real-Time Progress Stream)
+# 5. GET /api/projects/{project_id}/events (Server-Sent Events Stream)
 @app.get("/api/projects/{project_id}/events")
 async def stream_project_events(project_id: str):
     async def event_generator():
         stages = [
-            {"stage": "PARSING", "percentage": 15, "agent": "Document Analyst", "pages": 12, "sources": 8, "msg": "Parsing PDF layout and headers..."},
+            {"stage": "PARSING", "percentage": 15, "agent": "Document Analyst", "pages": 12, "sources": 8, "msg": "Parsing PDF layout and section headers..."},
             {"stage": "CHUNKING", "percentage": 30, "agent": "Document Analyst", "pages": 24, "sources": 18, "msg": "Generating semantic text chunks..."},
             {"stage": "RAG_INDEXING", "percentage": 50, "agent": "Research Analyst", "pages": 24, "sources": 32, "msg": "Indexing vectors into Qdrant store..."},
             {"stage": "AI_ANALYSIS", "percentage": 70, "agent": "Technical Analyst", "pages": 24, "sources": 45, "msg": "Extracting methodology & algorithms..."},
