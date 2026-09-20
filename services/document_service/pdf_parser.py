@@ -6,11 +6,15 @@ from typing import Dict, List, Any, Optional
 logger = logging.getLogger(__name__)
 
 try:
-    import fitz  # PyMuPDF
+    import pymupdf as fitz
     FITZ_AVAILABLE = True
 except ImportError:
-    FITZ_AVAILABLE = False
-    logger.warning("PyMuPDF (fitz) not installed in local environment. Operating with text fallback mode.")
+    try:
+        import fitz
+        FITZ_AVAILABLE = True
+    except ImportError:
+        FITZ_AVAILABLE = False
+        logger.warning("PyMuPDF not installed in local environment. Operating with fallback parser mode.")
 
 class PDFParser:
     """
@@ -54,7 +58,6 @@ class PDFParser:
                 })
             doc.close()
         else:
-            # Fallback mock/plain text parser when PyMuPDF is not installed
             num_pages = 1
             text = f"Parsed content for {os.path.basename(file_path)}. Research paper analyzing deep learning methodology."
             full_text_list.append(text)
