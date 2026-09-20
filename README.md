@@ -1,6 +1,18 @@
 # Paper2Prototype 🚀
 > **"Turn Research Papers Into Real-World Software Prototypes."**
 
+[![GitHub Topics](https://img.shields.io/badge/Topics-Agentic%20AI%20%7C%20MLOps%20%7C%20GenAI%20%7C%20RAG-indigo.svg)](https://github.com/Monishwarann/paper2prototype)
+[![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](LICENSE)
+[![Next.js 14](https://img.shields.io/badge/Frontend-Next.js%2014-purple.svg)](https://nextjs.org)
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-teal.svg)](https://fastapi.tiangolo.com)
+
+---
+
+### 🏷️ GitHub Repository Topics & Keywords
+`agentic-ai` • `agents` • `artificial-intelligence` • `background-jobs` • `data-pipelines` • `devops` • `distributed-systems` • `genai` • `gpu-computing` • `infrastructure` • `mlops` • `multi-model-pipeline` • `workflow-engine` • `workflows` • `rag-pipeline` • `fastapi` • `nextjs` • `reactflow`
+
+---
+
 Paper2Prototype is an enterprise-grade AI research-to-implementation platform. It bridges the gap between academic research literature and real-world software engineering by transforming uploaded research paper PDFs into comprehensive, implementation-ready software blueprints, interactive system architectures, PostgreSQL database schemas, FastAPI REST specifications, machine learning pipelines, 8-phase engineering roadmaps, and starter code blueprints—all with strict anti-hallucination source evidence attribution.
 
 ---
@@ -90,12 +102,17 @@ paper2prototype/
 │   │   │   ├── app/
 │   │   │   │   ├── layout.tsx        # Root layout & dark glassmorphism theme
 │   │   │   │   ├── page.tsx          # Landing page & drag-and-drop PDF upload zone
+│   │   │   │   ├── login/page.tsx    # Login Authentication Page
+│   │   │   │   ├── register/page.tsx # User Registration Page
+│   │   │   │   ├── dashboard/page.tsx# Developer Dashboard & "+ New Project" Modal
 │   │   │   │   ├── globals.css       # Tailwind CSS custom styling tokens
 │   │   │   │   └── projects/[id]/
 │   │   │   │       └── page.tsx      # Interactive Engineering Workspace Dashboard
 │   │   │   └── components/
 │   │   │       ├── ReactFlowCanvas.tsx   # Interactive Architecture Node Diagram (React Flow)
 │   │   │       ├── MonacoCodeViewer.tsx  # Multi-File Starter Code Editor (Monaco Editor)
+│   │   │       ├── NewProjectModal.tsx   # Project creation & AI provider selector modal
+│   │   │       ├── LiveResearchPanel.tsx # Real-time citation & RAG intelligence panel
 │   │   │       └── EvidenceBadge.tsx     # Provenance Badge & Source Quote Renderer
 │   │   ├── next.config.mjs
 │   │   ├── tailwind.config.js
@@ -104,7 +121,7 @@ paper2prototype/
 │   │
 │   └── backend/                      # FastAPI Backend Gateway
 │       ├── app/
-│       │   ├── main.py               # 17 Connected REST API Routes & File Handlers
+│       │   ├── main.py               # 25+ Connected REST API Routes & SSE Event Stream
 │       │   └── models/
 │       │       └── schemas.py        # Pydantic v2 Schemas for 28 Output Artifacts
 │       └── requirements.txt
@@ -115,6 +132,7 @@ paper2prototype/
 │   │   └── chunker.py                # Semantic Chunker with Page/Section Metadata
 │   └── ai_service/                   # AI Intelligence & RAG Engine
 │       ├── agent_orchestrator.py     # 12 Specialized AI Agents Coordinator
+│       ├── architecture_critic.py    # AI Architecture Critic & Cost Estimator
 │       ├── evidence_engine.py        # Anti-Hallucination Evidence Attribution Engine
 │       ├── llm_client.py             # Unified Groq, Gemini & HuggingFace LLM Router
 │       └── rag_engine.py             # Embedding Generation & Vector Semantic Retriever
@@ -213,9 +231,9 @@ AUTH_SECRET="super-secret-key-min-32-chars"
 
 ---
 
-## 🌐 Connected REST API Specification (17 Endpoints)
+## 🌐 Connected REST API Specification (25+ Endpoints)
 
-All 17 core REST endpoints are active and connected between the FastAPI gateway and Next.js frontend:
+All core REST endpoints are active and connected between the FastAPI gateway and Next.js frontend:
 
 | # | Endpoint Path | Method | Description | Status |
 | :-: | :--- | :--- | :--- | :-: |
@@ -223,19 +241,21 @@ All 17 core REST endpoints are active and connected between the FastAPI gateway 
 | **2** | `/api/projects` | `GET` | List all user projects | 🟢 Connected |
 | **3** | `/api/projects/{project_id}` | `GET` | Get project status & paper details | 🟢 Connected |
 | **4** | `/api/projects/{project_id}/papers` | `POST` | Upload research paper PDF file | 🟢 Connected |
-| **5** | `/api/papers/{paper_id}` | `GET` | Get uploaded paper metadata | 🟢 Connected |
-| **6** | `/api/papers/{paper_id}/analyze` | `POST` | Trigger multi-agent RAG analysis | 🟢 Connected |
-| **7** | `/api/papers/{paper_id}/analysis` | `GET` | Get research problem & gap synthesis | 🟢 Connected |
-| **8** | `/api/projects/{project_id}/architecture/generate` | `POST` | Generate system component architecture | 🟢 Connected |
+| **5** | `/api/projects/{project_id}/events` | `GET` | Server-Sent Events (SSE) real-time stage stream | 🟢 Connected |
+| **6** | `/api/papers/{paper_id}` | `GET` | Get uploaded paper metadata | 🟢 Connected |
+| **7** | `/api/papers/{paper_id}/analyze` | `POST` | Trigger multi-agent RAG analysis | 🟢 Connected |
+| **8** | `/api/papers/{paper_id}/analysis` | `GET` | Get research problem & gap synthesis | 🟢 Connected |
 | **9** | `/api/projects/{project_id}/architecture` | `GET` | Get React Flow node graph topology | 🟢 Connected |
-| **10** | `/api/projects/{project_id}/requirements/generate` | `POST` | Generate FR & NFR software requirements | 🟢 Connected |
-| **11** | `/api/projects/{project_id}/requirements` | `GET` | Get evidence-attributed requirements | 🟢 Connected |
-| **12** | `/api/projects/{project_id}/roadmap/generate` | `POST` | Generate 8-phase engineering roadmap | 🟢 Connected |
-| **13** | `/api/projects/{project_id}/roadmap` | `GET` | Get implementation tasks & effort hours | 🟢 Connected |
-| **14** | `/api/projects/{project_id}/code/generate` | `POST` | Generate starter code blueprints | 🟢 Connected |
-| **15** | `/api/projects/{project_id}/artifacts` | `GET` | Get master 28-field research blueprint | 🟢 Connected |
-| **16** | `/api/artifacts/{artifact_id}/regenerate` | `POST` | Regenerate specific section artifacts | 🟢 Connected |
-| **17** | `/api/projects/{project_id}/export` | `POST/GET` | Export blueprint to Markdown, JSON, PDF, or ZIP | 🟢 Connected |
+| **10** | `/api/projects/{project_id}/requirements` | `GET` | Get evidence-attributed requirements | 🟢 Connected |
+| **11** | `/api/projects/{project_id}/database` | `GET` | Get PostgreSQL ERD schema tables | 🟢 Connected |
+| **12** | `/api/projects/{project_id}/api` | `GET` | Get REST OpenAPI endpoint specs | 🟢 Connected |
+| **13** | `/api/projects/{project_id}/ml` | `GET` | Get ML pipeline stage specs | 🟢 Connected |
+| **14** | `/api/projects/{project_id}/roadmap` | `GET` | Get 8-phase implementation roadmap | 🟢 Connected |
+| **15** | `/api/projects/{project_id}/code` | `GET` | Get starter code blueprints | 🟢 Connected |
+| **16** | `/api/projects/{project_id}/critic` | `GET` | Get AI architecture critic audit | 🟢 Connected |
+| **17** | `/api/projects/{project_id}/cost-estimate` | `GET` | Get itemized cloud infrastructure cost estimates | 🟢 Connected |
+| **18** | `/api/projects/{project_id}/artifacts` | `GET` | Get master 28-field research blueprint | 🟢 Connected |
+| **19** | `/api/projects/{project_id}/export` | `POST/GET` | Export blueprint to Markdown, JSON, PDF, or ZIP | 🟢 Connected |
 
 ---
 
@@ -297,4 +317,3 @@ python -c "import sys, os; sys.path.extend(['.', 'apps/backend']); from tests.te
 
 Copyright (c) 2026 Monishwaran. All Rights Reserved.  
 Released under the [MIT License](LICENSE).
-

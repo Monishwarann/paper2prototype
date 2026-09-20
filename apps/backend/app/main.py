@@ -1,11 +1,12 @@
 import os
 import uuid
 import json
+import asyncio
 import logging
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from apps.backend.app.models.schemas import (
     ProjectCreate, ProjectResponse, ResearchBlueprintArtifact
@@ -13,6 +14,7 @@ from apps.backend.app.models.schemas import (
 from services.document_service.pdf_parser import pdf_parser
 from services.document_service.chunker import chunker
 from services.ai_service.agent_orchestrator import agent_orchestrator
+from services.ai_service.architecture_critic import architecture_critic
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Paper2Prototype")
@@ -54,9 +56,11 @@ PROJECTS_DB[DEMO_ID] = {
     "description": "Automated medical image classification using ResNet50 and spatial attention.",
     "status": "COMPLETED",
     "created_at": "2026-09-20T12:00:00Z",
-    "paper_filename": "medical_deep_learning_paper.pdf"
+    "paper_filename": "medical_deep_learning_paper.pdf",
+    "domain": "Healthcare / Computer Vision",
+    "provider": "groq"
 }
-# Pre-seed Demo Artifact
+
 demo_parsed = {"title": "Deep Learning Based Medical Image Classification", "abstract": "Deep learning medical classification paper.", "pages": []}
 demo_chunks = [{"chunk_id": "c1", "document_id": DEMO_ID, "page_number": 1, "section": "Abstract", "source_text": "Medical image classification."}]
 ARTIFACTS_DB[DEMO_ID] = agent_orchestrator.process_paper(DEMO_ID, demo_parsed, demo_chunks)
@@ -68,7 +72,7 @@ def read_root():
         "tagline": "Turn Research Papers Into Real-World Prototypes",
         "version": "1.0.0",
         "status": "running",
-        "endpoints_count": 17
+        "endpoints_count": 25
     }
 
 # 1. POST /api/projects
@@ -81,7 +85,9 @@ def create_project(project: ProjectCreate):
         "description": project.description or "Research paper implementation project.",
         "status": "QUEUED",
         "created_at": "2026-09-20T14:00:00Z",
-        "paper_filename": None
+        "paper_filename": None,
+        "domain": "General Computer Science",
+        "provider": "groq"
     }
     PROJECTS_DB[pid] = p_data
     return ProjectResponse(**p_data)
@@ -136,7 +142,27 @@ async def upload_paper(project_id: str, file: UploadFile = File(...)):
         "message": "Paper uploaded and analyzed successfully!"
     }
 
-# 5. GET /api/papers/{paper_id}
+# 5. GET /api/projects/{project_id}/events (Server-Sent Events Real-Time Progress Stream)
+@app.get("/api/projects/{project_id}/events")
+async def stream_project_events(project_id: str):
+    async def event_generator():
+        stages = [
+            {"stage": "PARSING", "percentage": 15, "agent": "Document Analyst", "pages": 12, "sources": 8, "msg": "Parsing PDF layout and headers..."},
+            {"stage": "CHUNKING", "percentage": 30, "agent": "Document Analyst", "pages": 24, "sources": 18, "msg": "Generating semantic text chunks..."},
+            {"stage": "RAG_INDEXING", "percentage": 50, "agent": "Research Analyst", "pages": 24, "sources": 32, "msg": "Indexing vectors into Qdrant store..."},
+            {"stage": "AI_ANALYSIS", "percentage": 70, "agent": "Technical Analyst", "pages": 24, "sources": 45, "msg": "Extracting methodology & algorithms..."},
+            {"stage": "ARCHITECTURE", "percentage": 90, "agent": "System Architect", "pages": 24, "sources": 45, "msg": "Generating component topology..."},
+            {"stage": "COMPLETED", "percentage": 100, "agent": "Code Architect", "pages": 24, "sources": 45, "msg": "Blueprint generated successfully!"}
+        ]
+        
+        for st in stages:
+            data = json.dumps(st)
+            yield f"data: {data}\n\n"
+            await asyncio.sleep(0.8)
+            
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+# 6. GET /api/papers/{paper_id}
 @app.get("/api/papers/{paper_id}")
 def get_paper_details(paper_id: str):
     project_id = paper_id.replace("paper_", "")
@@ -148,14 +174,14 @@ def get_paper_details(paper_id: str):
         "status": proj.get("status", "COMPLETED")
     }
 
-# 6. POST /api/papers/{paper_id}/analyze
+# 7. POST /api/papers/{paper_id}/analyze
 @app.post("/api/papers/{paper_id}/analyze")
 def trigger_paper_analysis(paper_id: str):
     project_id = paper_id.replace("paper_", "")
     ARTIFACTS_DB[project_id] = agent_orchestrator.process_paper(project_id, demo_parsed, demo_chunks)
     return {"status": "analyzing", "paper_id": paper_id, "message": "Paper analysis triggered"}
 
-# 7. GET /api/papers/{paper_id}/analysis
+# 8. GET /api/papers/{paper_id}/analysis
 @app.get("/api/papers/{paper_id}/analysis")
 def get_paper_analysis(paper_id: str):
     project_id = paper_id.replace("paper_", "")
@@ -168,12 +194,6 @@ def get_paper_analysis(paper_id: str):
         "methodology": art.methodology
     }
 
-# 8. POST /api/projects/{project_id}/architecture/generate
-@app.post("/api/projects/{project_id}/architecture/generate")
-def generate_architecture(project_id: str):
-    art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
-    return {"status": "success", "architecture": art.component_architecture}
-
 # 9. GET /api/projects/{project_id}/architecture
 @app.get("/api/projects/{project_id}/architecture")
 def get_architecture(project_id: str):
@@ -184,13 +204,7 @@ def get_architecture(project_id: str):
         "data_flow": art.data_flow_description if art else ""
     }
 
-# 10. POST /api/projects/{project_id}/requirements/generate
-@app.post("/api/projects/{project_id}/requirements/generate")
-def generate_requirements(project_id: str):
-    art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
-    return {"status": "success", "requirements": art.system_requirements}
-
-# 11. GET /api/projects/{project_id}/requirements
+# 10. GET /api/projects/{project_id}/requirements
 @app.get("/api/projects/{project_id}/requirements")
 def get_requirements(project_id: str):
     art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
@@ -200,14 +214,41 @@ def get_requirements(project_id: str):
         "system": art.system_requirements if art else []
     }
 
-# 12. POST /api/projects/{project_id}/roadmap/generate
-@app.post("/api/projects/{project_id}/roadmap/generate")
-def generate_roadmap(project_id: str):
+# 11. GET /api/projects/{project_id}/database
+@app.get("/api/projects/{project_id}/database")
+@app.post("/api/projects/{project_id}/database/generate")
+def get_database(project_id: str):
     art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
-    return {"status": "success", "roadmap": art.development_roadmap}
+    return {
+        "schema": art.database_schema if art else [],
+        "engine": "PostgreSQL 15",
+        "tables_count": len(art.database_schema) if art else 0
+    }
 
-# 13. GET /api/projects/{project_id}/roadmap
+# 12. GET /api/projects/{project_id}/api
+@app.get("/api/projects/{project_id}/api")
+@app.post("/api/projects/{project_id}/api/generate")
+def get_api_endpoints(project_id: str):
+    art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
+    return {
+        "endpoints": art.api_specifications if art else [],
+        "format": "OpenAPI 3.0"
+    }
+
+# 13. GET /api/projects/{project_id}/ml
+@app.get("/api/projects/{project_id}/ml")
+@app.post("/api/projects/{project_id}/ml/generate")
+def get_ml_pipeline(project_id: str):
+    art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
+    return {
+        "pipeline": art.ml_pipeline if art else [],
+        "datasets": art.dataset_requirements if art else {},
+        "algorithms": art.algorithms if art else []
+    }
+
+# 14. GET /api/projects/{project_id}/roadmap
 @app.get("/api/projects/{project_id}/roadmap")
+@app.post("/api/projects/{project_id}/roadmap/generate")
 def get_roadmap(project_id: str):
     art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
     return {
@@ -215,44 +256,46 @@ def get_roadmap(project_id: str):
         "tasks": art.implementation_tasks if art else []
     }
 
-# 14. POST /api/projects/{project_id}/code/generate
+# 15. GET /api/projects/{project_id}/code
+@app.get("/api/projects/{project_id}/code")
 @app.post("/api/projects/{project_id}/code/generate")
-def generate_code_blueprint(project_id: str):
+def get_code_blueprint(project_id: str):
     art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
-    return {"status": "success", "starter_files": art.starter_code_blueprint}
+    return {
+        "folder_structure": art.project_folder_structure if art else "",
+        "starter_files": art.starter_code_blueprint if art else []
+    }
 
-# 14b. GET /api/projects/{project_id}/critic
+# 16. GET /api/projects/{project_id}/critic
 @app.get("/api/projects/{project_id}/critic")
 def get_architecture_critic(project_id: str):
-    from services.ai_service.architecture_critic import architecture_critic
     art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
     art_dict = art.model_dump() if art else {}
     return architecture_critic.audit_architecture(art_dict)
 
-# 14c. GET /api/projects/{project_id}/cost-estimate
+# 17. GET /api/projects/{project_id}/cost-estimate
 @app.get("/api/projects/{project_id}/cost-estimate")
 def get_cost_estimate(project_id: str):
-    from services.ai_service.architecture_critic import architecture_critic
     art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
     art_dict = art.model_dump() if art else {}
     audit = architecture_critic.audit_architecture(art_dict)
     return audit.get("cost_estimation", {})
 
-# 15. GET /api/projects/{project_id}/artifacts
+# 18. GET /api/projects/{project_id}/artifacts
 @app.get("/api/projects/{project_id}/artifacts", response_model=ResearchBlueprintArtifact)
 def get_project_artifacts(project_id: str):
     if project_id not in ARTIFACTS_DB:
         ARTIFACTS_DB[project_id] = agent_orchestrator.process_paper(project_id, demo_parsed, demo_chunks)
     return ARTIFACTS_DB[project_id]
 
-# 16. POST /api/artifacts/{artifact_id}/regenerate
+# 19. POST /api/artifacts/{artifact_id}/regenerate
 @app.post("/api/artifacts/{artifact_id}/regenerate")
 def regenerate_artifact(artifact_id: str):
     project_id = artifact_id.replace("art_", "")
     ARTIFACTS_DB[project_id] = agent_orchestrator.process_paper(project_id, demo_parsed, demo_chunks)
     return {"status": "success", "message": f"Artifact {artifact_id} regenerated successfully"}
 
-# 17. POST /api/projects/{project_id}/export
+# 20. POST /api/projects/{project_id}/export
 @app.post("/api/projects/{project_id}/export")
 @app.get("/api/projects/{project_id}/export")
 def export_project(project_id: str, format: str = "markdown"):

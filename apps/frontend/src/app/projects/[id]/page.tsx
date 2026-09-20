@@ -6,12 +6,13 @@ import { useParams } from 'next/navigation';
 import {
   Cpu, FileText, LayoutDashboard, Layers, Database,
   Code, ShieldCheck, GitBranch, Download, CheckCircle,
-  AlertTriangle, RefreshCw, Activity, ListChecks
+  AlertTriangle, RefreshCw, Activity, ListChecks, Copy, Play, Check
 } from 'lucide-react';
 
 import { ReactFlowCanvas } from '@/components/ReactFlowCanvas';
 import { MonacoCodeViewer } from '@/components/MonacoCodeViewer';
 import { EvidenceBadge } from '@/components/EvidenceBadge';
+import { LiveResearchPanel } from '@/components/LiveResearchPanel';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -19,9 +20,10 @@ export default function ProjectWorkspacePage() {
   const params = useParams();
   const projectId = (params?.id as string) || 'demo-medical-classifier';
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'paper' | 'requirements' | 'architecture' | 'database' | 'api' | 'ml' | 'roadmap' | 'code' | 'export'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'requirements' | 'architecture' | 'database' | 'api' | 'ml' | 'roadmap' | 'code'>('overview');
   const [artifact, setArtifact] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [copiedPath, setCopiedPath] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchArtifacts() {
@@ -44,21 +46,27 @@ export default function ProjectWorkspacePage() {
     window.open(`${API_BASE}/projects/${projectId}/export?format=${format}`, '_blank');
   };
 
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedPath(label);
+    setTimeout(() => setCopiedPath(null), 2000);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center space-x-3 text-indigo-400">
         <RefreshCw className="w-6 h-6 animate-spin" />
-        <span className="font-mono text-sm">Loading Research Blueprint Artifacts...</span>
+        <span className="font-mono text-sm">Loading Research Blueprint Workspace...</span>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-dark-900 flex flex-col">
-      {/* Top Header */}
+      {/* Top Navigation Bar */}
       <header className="border-b border-gray-800 bg-dark-800/80 backdrop-blur px-6 py-3 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center space-x-4">
-          <Link href="/" className="flex items-center space-x-2 text-indigo-400 hover:text-indigo-300 transition">
+          <Link href="/dashboard" className="flex items-center space-x-2 text-indigo-400 hover:text-indigo-300 transition">
             <Cpu className="w-6 h-6" />
             <span className="font-bold text-sm tracking-tight text-white">Paper2Prototype</span>
           </Link>
@@ -84,12 +92,12 @@ export default function ProjectWorkspacePage() {
         </div>
       </header>
 
-      {/* Main Workspace Body */}
+      {/* Main Workspace Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-64 bg-dark-800/60 border-r border-gray-800 p-4 space-y-1 text-xs">
+        {/* Left Sidebar Nav */}
+        <aside className="w-60 bg-dark-800/60 border-r border-gray-800 p-4 space-y-1 text-xs">
           <div className="px-3 py-2 text-[10px] uppercase font-bold text-gray-400 tracking-wider">
-            Workspace Views
+            IDE Workspace Tabs
           </div>
 
           <button
@@ -99,7 +107,7 @@ export default function ProjectWorkspacePage() {
             }`}
           >
             <LayoutDashboard className="w-4 h-4" />
-            <span>Overview & Dashboard</span>
+            <span>Overview & Metrics</span>
           </button>
 
           <button
@@ -109,7 +117,7 @@ export default function ProjectWorkspacePage() {
             }`}
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>Software Requirements</span>
+            <span>Requirements</span>
           </button>
 
           <button
@@ -119,7 +127,7 @@ export default function ProjectWorkspacePage() {
             }`}
           >
             <Layers className="w-4 h-4" />
-            <span>System Architecture</span>
+            <span>Architecture Canvas</span>
           </button>
 
           <button
@@ -129,7 +137,17 @@ export default function ProjectWorkspacePage() {
             }`}
           >
             <Database className="w-4 h-4" />
-            <span>Database & ERD Schema</span>
+            <span>Database ERD</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('api')}
+            className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg font-medium transition ${
+              activeTab === 'api' ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+            }`}
+          >
+            <Code className="w-4 h-4" />
+            <span>REST API Specs</span>
           </button>
 
           <button
@@ -139,7 +157,7 @@ export default function ProjectWorkspacePage() {
             }`}
           >
             <Activity className="w-4 h-4" />
-            <span>ML Pipeline Specs</span>
+            <span>ML Pipeline</span>
           </button>
 
           <button
@@ -158,17 +176,16 @@ export default function ProjectWorkspacePage() {
               activeTab === 'code' ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
             }`}
           >
-            <Code className="w-4 h-4" />
+            <FileText className="w-4 h-4" />
             <span>Starter Code Blueprint</span>
           </button>
         </aside>
 
-        {/* Content Area */}
+        {/* Center Main Content Area */}
         <main className="flex-1 p-6 overflow-y-auto space-y-6">
           {/* TAB 1: OVERVIEW */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
-              {/* Top KPI Cards */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="glass-card p-4 rounded-xl space-y-1 border border-indigo-500/20">
                   <span className="text-xs text-gray-400 font-mono">PROTOTYPE READINESS</span>
@@ -195,16 +212,13 @@ export default function ProjectWorkspacePage() {
                 </div>
               </div>
 
-              {/* Problem & Gap Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="glass-panel p-6 rounded-xl space-y-3">
                   <h3 className="font-bold text-lg text-white flex items-center space-x-2">
                     <AlertTriangle className="w-5 h-5 text-amber-400" />
                     <span>Research Problem</span>
                   </h3>
-                  <p className="text-sm text-gray-300 leading-relaxed">
-                    {artifact?.research_problem}
-                  </p>
+                  <p className="text-sm text-gray-300 leading-relaxed">{artifact?.research_problem}</p>
                 </div>
 
                 <div className="glass-panel p-6 rounded-xl space-y-3">
@@ -212,13 +226,10 @@ export default function ProjectWorkspacePage() {
                     <ListChecks className="w-5 h-5 text-indigo-400" />
                     <span>Research Gap</span>
                   </h3>
-                  <p className="text-sm text-gray-300 leading-relaxed">
-                    {artifact?.research_gap}
-                  </p>
+                  <p className="text-sm text-gray-300 leading-relaxed">{artifact?.research_gap}</p>
                 </div>
               </div>
 
-              {/* Recommended Stack */}
               <div className="glass-panel p-6 rounded-xl space-y-4">
                 <h3 className="font-bold text-lg text-white">Recommended Technology Stack</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -242,7 +253,7 @@ export default function ProjectWorkspacePage() {
           {/* TAB: REQUIREMENTS */}
           {activeTab === 'requirements' && (
             <div className="glass-panel p-6 rounded-xl space-y-6">
-              <h2 className="text-xl font-bold text-white">Functional & System Requirements</h2>
+              <h2 className="text-xl font-bold text-white">Software Requirements Specification</h2>
               <div className="space-y-4">
                 {artifact?.system_requirements?.map((req: any, idx: number) => (
                   <div key={idx} className="bg-dark-800 p-4 rounded-lg border border-gray-800 space-y-2">
@@ -267,27 +278,32 @@ export default function ProjectWorkspacePage() {
 
           {/* TAB: ARCHITECTURE */}
           {activeTab === 'architecture' && (
-            <div className="space-y-6">
-              <div className="glass-panel p-6 rounded-xl space-y-4">
-                <h2 className="text-xl font-bold text-white">Interactive System Architecture Canvas</h2>
-                <p className="text-xs text-gray-400">
-                  Visual node topology generated by System Architect Agent. Zoom, drag, and inspect component boundaries.
-                </p>
-                <ReactFlowCanvas components={artifact?.component_architecture} />
-              </div>
+            <div className="glass-panel p-6 rounded-xl space-y-4">
+              <h2 className="text-xl font-bold text-white">Interactive System Architecture Canvas</h2>
+              <p className="text-xs text-gray-400">React Flow interactive node topology. Drag, connect, and inspect components.</p>
+              <ReactFlowCanvas components={artifact?.component_architecture} />
             </div>
           )}
 
           {/* TAB: DATABASE */}
           {activeTab === 'database' && (
             <div className="glass-panel p-6 rounded-xl space-y-6">
-              <h2 className="text-xl font-bold text-white">PostgreSQL ERD Schema & Tables</h2>
+              <h2 className="text-xl font-bold text-white">PostgreSQL ERD Database Schema</h2>
               <div className="space-y-4">
                 {artifact?.database_schema?.map((entity: any, idx: number) => (
                   <div key={idx} className="bg-dark-800 p-4 rounded-lg border border-gray-800 space-y-3">
-                    <div className="flex items-center space-x-2">
-                      <Database className="w-4 h-4 text-emerald-400" />
-                      <span className="font-mono text-sm font-bold text-white">{entity.table_name}</span>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center space-x-2">
+                        <Database className="w-4 h-4 text-emerald-400" />
+                        <span className="font-mono text-sm font-bold text-white">{entity.table_name}</span>
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard(`CREATE TABLE ${entity.table_name} (...);`, entity.table_name)}
+                        className="flex items-center space-x-1 text-[10px] text-gray-400 hover:text-white bg-dark-900 px-2 py-1 rounded border border-gray-700"
+                      >
+                        {copiedPath === entity.table_name ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedPath === entity.table_name ? 'Copied' : 'Copy SQL'}</span>
+                      </button>
                     </div>
                     <p className="text-xs text-gray-400">{entity.description}</p>
                     <div className="overflow-x-auto">
@@ -311,6 +327,31 @@ export default function ProjectWorkspacePage() {
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: API */}
+          {activeTab === 'api' && (
+            <div className="glass-panel p-6 rounded-xl space-y-6">
+              <h2 className="text-xl font-bold text-white">REST OpenAPI Endpoint Specifications</h2>
+              <div className="space-y-4">
+                {artifact?.api_specifications?.map((api: any, idx: number) => (
+                  <div key={idx} className="bg-dark-800 p-4 rounded-lg border border-gray-800 space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                        api.method === 'GET' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                      }`}>
+                        {api.method}
+                      </span>
+                      <span className="font-mono text-sm font-bold text-white">{api.path}</span>
+                    </div>
+                    <p className="text-xs text-gray-300">{api.summary}</p>
+                    <div className="bg-dark-900 p-3 rounded text-[11px] font-mono text-gray-300 overflow-x-auto">
+                      <code>curl -X {api.method} "http://localhost:8000{api.path}" -H "Authorization: Bearer Token"</code>
                     </div>
                   </div>
                 ))}
@@ -363,6 +404,14 @@ export default function ProjectWorkspacePage() {
             </div>
           )}
         </main>
+
+        {/* Right Live Research Intelligence Drawer */}
+        <aside className="w-72 hidden lg:block p-4 border-l border-gray-800 bg-dark-900">
+          <LiveResearchPanel
+            paperTitle={artifact?.paper_title}
+            provider={artifact?.provider || 'groq'}
+          />
+        </aside>
       </div>
     </div>
   );
