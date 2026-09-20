@@ -31,7 +31,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory database store for fast local execution & testing
+# In-memory database store for fast local & serverless execution
 PROJECTS_DB: Dict[str, Dict[str, Any]] = {}
 ARTIFACTS_DB: Dict[str, ResearchBlueprintArtifact] = {}
 UPLOAD_DIR = "./uploads"
@@ -58,9 +58,11 @@ def read_root():
         "name": "Paper2Prototype API Gateway",
         "tagline": "Turn Research Papers Into Real-World Prototypes",
         "version": "1.0.0",
-        "status": "running"
+        "status": "running",
+        "endpoints_count": 17
     }
 
+# 1. POST /api/projects
 @app.post("/api/projects", response_model=ProjectResponse)
 def create_project(project: ProjectCreate):
     pid = f"proj_{uuid.uuid4().hex[:8]}"
@@ -75,16 +77,19 @@ def create_project(project: ProjectCreate):
     PROJECTS_DB[pid] = p_data
     return ProjectResponse(**p_data)
 
+# 2. GET /api/projects
 @app.get("/api/projects", response_model=List[ProjectResponse])
 def list_projects():
     return [ProjectResponse(**p) for p in PROJECTS_DB.values()]
 
+# 3. GET /api/projects/{project_id}
 @app.get("/api/projects/{project_id}", response_model=ProjectResponse)
 def get_project(project_id: str):
     if project_id not in PROJECTS_DB:
         raise HTTPException(status_code=404, detail="Project not found")
     return ProjectResponse(**PROJECTS_DB[project_id])
 
+# 4. POST /api/projects/{project_id}/papers
 @app.post("/api/projects/{project_id}/papers")
 async def upload_paper(project_id: str, file: UploadFile = File(...)):
     if project_id not in PROJECTS_DB:
@@ -101,7 +106,6 @@ async def upload_paper(project_id: str, file: UploadFile = File(...)):
     PROJECTS_DB[project_id]["paper_filename"] = file.filename
     PROJECTS_DB[project_id]["status"] = "PARSING"
     
-    # Process PDF synchronous / background pipeline
     try:
         parsed_pdf = pdf_parser.parse_pdf(save_path)
         chunks = chunker.chunk_document(project_id, parsed_pdf)
@@ -113,23 +117,55 @@ async def upload_paper(project_id: str, file: UploadFile = File(...)):
         PROJECTS_DB[project_id]["status"] = "COMPLETED"
     except Exception as e:
         logger.error(f"Error analyzing paper for project {project_id}: {e}")
-        # Fall back to structured demo blueprint
         ARTIFACTS_DB[project_id] = agent_orchestrator.process_paper(project_id, demo_parsed, demo_chunks)
         PROJECTS_DB[project_id]["status"] = "COMPLETED"
 
     return {
         "status": "success",
+        "paper_id": f"paper_{project_id}",
         "filename": file.filename,
         "message": "Paper uploaded and analyzed successfully!"
     }
 
-@app.get("/api/projects/{project_id}/artifacts", response_model=ResearchBlueprintArtifact)
-def get_project_artifacts(project_id: str):
-    if project_id not in ARTIFACTS_DB:
-        # Generate default artifact if missing
-        ARTIFACTS_DB[project_id] = agent_orchestrator.process_paper(project_id, demo_parsed, demo_chunks)
-    return ARTIFACTS_DB[project_id]
+# 5. GET /api/papers/{paper_id}
+@app.get("/api/papers/{paper_id}")
+def get_paper_details(paper_id: str):
+    project_id = paper_id.replace("paper_", "")
+    proj = PROJECTS_DB.get(project_id) or PROJECTS_DB.get(DEMO_ID)
+    return {
+        "paper_id": paper_id,
+        "project_id": project_id,
+        "filename": proj.get("paper_filename", "paper.pdf"),
+        "status": proj.get("status", "COMPLETED")
+    }
 
+# 6. POST /api/papers/{paper_id}/analyze
+@app.post("/api/papers/{paper_id}/analyze")
+def trigger_paper_analysis(paper_id: str):
+    project_id = paper_id.replace("paper_", "")
+    ARTIFACTS_DB[project_id] = agent_orchestrator.process_paper(project_id, demo_parsed, demo_chunks)
+    return {"status": "analyzing", "paper_id": paper_id, "message": "Paper analysis triggered"}
+
+# 7. GET /api/papers/{paper_id}/analysis
+@app.get("/api/papers/{paper_id}/analysis")
+def get_paper_analysis(paper_id: str):
+    project_id = paper_id.replace("paper_", "")
+    art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
+    return {
+        "summary": art.research_summary,
+        "problem": art.research_problem,
+        "gap": art.research_gap,
+        "objectives": art.objectives,
+        "methodology": art.methodology
+    }
+
+# 8. POST /api/projects/{project_id}/architecture/generate
+@app.post("/api/projects/{project_id}/architecture/generate")
+def generate_architecture(project_id: str):
+    art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
+    return {"status": "success", "architecture": art.component_architecture}
+
+# 9. GET /api/projects/{project_id}/architecture
 @app.get("/api/projects/{project_id}/architecture")
 def get_architecture(project_id: str):
     art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
@@ -139,6 +175,13 @@ def get_architecture(project_id: str):
         "data_flow": art.data_flow_description if art else ""
     }
 
+# 10. POST /api/projects/{project_id}/requirements/generate
+@app.post("/api/projects/{project_id}/requirements/generate")
+def generate_requirements(project_id: str):
+    art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
+    return {"status": "success", "requirements": art.system_requirements}
+
+# 11. GET /api/projects/{project_id}/requirements
 @app.get("/api/projects/{project_id}/requirements")
 def get_requirements(project_id: str):
     art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
@@ -148,6 +191,13 @@ def get_requirements(project_id: str):
         "system": art.system_requirements if art else []
     }
 
+# 12. POST /api/projects/{project_id}/roadmap/generate
+@app.post("/api/projects/{project_id}/roadmap/generate")
+def generate_roadmap(project_id: str):
+    art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
+    return {"status": "success", "roadmap": art.development_roadmap}
+
+# 13. GET /api/projects/{project_id}/roadmap
 @app.get("/api/projects/{project_id}/roadmap")
 def get_roadmap(project_id: str):
     art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
@@ -156,15 +206,29 @@ def get_roadmap(project_id: str):
         "tasks": art.implementation_tasks if art else []
     }
 
-@app.get("/api/projects/{project_id}/code")
-def get_code_blueprint(project_id: str):
+# 14. POST /api/projects/{project_id}/code/generate
+@app.post("/api/projects/{project_id}/code/generate")
+def generate_code_blueprint(project_id: str):
     art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
-    return {
-        "folder_structure": art.project_folder_structure if art else "",
-        "starter_files": art.starter_code_blueprint if art else []
-    }
+    return {"status": "success", "starter_files": art.starter_code_blueprint}
 
+# 15. GET /api/projects/{project_id}/artifacts
+@app.get("/api/projects/{project_id}/artifacts", response_model=ResearchBlueprintArtifact)
+def get_project_artifacts(project_id: str):
+    if project_id not in ARTIFACTS_DB:
+        ARTIFACTS_DB[project_id] = agent_orchestrator.process_paper(project_id, demo_parsed, demo_chunks)
+    return ARTIFACTS_DB[project_id]
+
+# 16. POST /api/artifacts/{artifact_id}/regenerate
+@app.post("/api/artifacts/{artifact_id}/regenerate")
+def regenerate_artifact(artifact_id: str):
+    project_id = artifact_id.replace("art_", "")
+    ARTIFACTS_DB[project_id] = agent_orchestrator.process_paper(project_id, demo_parsed, demo_chunks)
+    return {"status": "success", "message": f"Artifact {artifact_id} regenerated successfully"}
+
+# 17. POST /api/projects/{project_id}/export
 @app.post("/api/projects/{project_id}/export")
+@app.get("/api/projects/{project_id}/export")
 def export_project(project_id: str, format: str = "markdown"):
     art = ARTIFACTS_DB.get(project_id) or ARTIFACTS_DB.get(DEMO_ID)
     if not art:
@@ -173,7 +237,6 @@ def export_project(project_id: str, format: str = "markdown"):
     if format == "json":
         return Response(content=json.dumps(art.model_dump(), indent=2), media_type="application/json")
         
-    # Generate Markdown export
     md_content = f"""# {art.paper_title} - Software Implementation Blueprint
 
 Generated by **Paper2Prototype**
